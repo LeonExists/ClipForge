@@ -28,20 +28,23 @@ class Config(BaseModel):
     # --- download ---
     precise_cuts: bool = True
     download_grouping: Literal["ranged", "covering", "auto"] = "ranged"
-    # HLS-first ladder. --download-sections routes yt-dlp to its ffmpeg downloader,
-    # which byte-seeks the source. Fragmented DASH (YouTube's default >=720p mp4) is
-    # NOT byte-seekable — ffmpeg then reads the whole remote file, which stalls AND
-    # drops the video track (audio-only output). HLS (m3u8_native) is segment-
-    # addressed, so ffmpeg fetches only the in-range segments: truly ranged, fast,
-    # and H.264 (cheaper to decode in the render pass than AV1). Progressive mp4
-    # (18/22) is the seekable non-HLS fallback; the bare tail is a last resort.
-    download_format: str = (
-        "b[protocol*=m3u8][height<=1080]"                          # HLS muxed H.264 (seekable, ranged)
-        "/bv*[protocol*=m3u8][height<=1080]+ba[protocol*=m3u8]"    # split HLS
-        "/b[protocol*=https][vcodec!=none][acodec!=none][ext=mp4][height<=1080]"  # progressive mp4 (18/22)
-        "/b[protocol*=m3u8]"                                       # any HLS above the cap
-        "/18/b"                                                    # guaranteed 360p, then last resort
-    )
+    download_max_height: int = 1080
+    # Ranged (--download-sections) format ladder. --download-sections routes yt-dlp
+    # to its ffmpeg downloader, which byte-seeks the source. Fragmented DASH
+    # (YouTube's default >=720p mp4) is NOT byte-seekable — ffmpeg reads the whole
+    # remote file, which stalls AND drops the video track (audio-only output). HLS
+    # (m3u8_native) is segment-addressed, so ffmpeg fetches only the in-range
+    # segments: truly ranged, fast, full-res H.264. But YouTube only serves HLS on
+    # ~half of requests here; when it's absent this ladder would fall to progressive
+    # 360p, so instead of degrading we fall back to a NATIVE full download (see
+    # download_full_format) which the caller cuts locally. `None` => derive from
+    # download_max_height via download.args.ranged_format_selector.
+    download_format: Optional[str] = None
+    # Native full-download selector (NO --download-sections => native downloader,
+    # which does not stall on fragmented DASH). Used when the ranged HLS attempt
+    # yields no usable video. Prefers H.264 (cheaper to decode than AV1) capped at
+    # download_max_height. `None` => derive via download.args.full_format_selector.
+    download_full_format: Optional[str] = None
     covering_overhead_factor: float = 1.5
     covering_gap_budget_sec: float = 30.0
     concurrent_fragments: int = 4

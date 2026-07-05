@@ -108,7 +108,10 @@ class ClipProcessor:
         def dl_progress(frac: float, status: str) -> None:
             emit(Stage.DOWNLOAD, frac * 100.0, status)
 
-        return self.downloader.fetch_ranged(clip, dl_progress)
+        # Pass the encoder so the native-full-download fallback can do a precise
+        # local re-encode cut (matches slice_from_covering's behaviour).
+        encoder = self._encoder() if self.cfg.precise_cuts else None
+        return self.downloader.fetch_ranged(clip, dl_progress, encoder)
 
     def _render(self, clip: Clip, seg: SegmentResult, artifacts, emit) -> tuple[Path, str]:
         src_info = ffprobe_dims(self.runner, seg.path)

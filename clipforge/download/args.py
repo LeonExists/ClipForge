@@ -24,6 +24,42 @@ def _fmt_time(t: float) -> str:
     return f"{t:.3f}".rstrip("0").rstrip(".")
 
 
+def ranged_format_selector(cfg: Config) -> str:
+    """Format selector for the ranged (--download-sections) fetch.
+
+    HLS-first: HLS (m3u8_native) is segment-addressed so the ffmpeg downloader that
+    --download-sections invokes fetches only in-range segments (fast, full-res). We
+    deliberately do NOT list progressive 360p here — a ranged miss should fall to
+    the native full download (full quality), not silently degrade to 360p. The bare
+    HLS tail covers a video whose only HLS is above the cap.
+    """
+    if cfg.download_format:
+        return cfg.download_format
+    h = cfg.download_max_height
+    return (
+        f"b[protocol*=m3u8][height<={h}]"                        # muxed HLS H.264 <= cap
+        f"/bv*[protocol*=m3u8][height<={h}]+ba[protocol*=m3u8]"  # split HLS
+        f"/b[protocol*=m3u8]"                                    # any HLS (e.g. only >cap exists)
+    )
+
+
+def full_format_selector(cfg: Config) -> str:
+    """Format selector for the native full download (no --download-sections).
+
+    Best mp4 <= cap, H.264 preferred (cheaper decode than AV1). The native
+    downloader handles fragmented DASH fine — only the ffmpeg byte-seek stalls.
+    """
+    if cfg.download_full_format:
+        return cfg.download_full_format
+    h = cfg.download_max_height
+    return (
+        f"bv*[height<={h}][vcodec^=avc1]+ba[ext=m4a]"  # H.264 video + m4a audio <= cap
+        f"/bv*[height<={h}]+ba"                        # any video + audio <= cap
+        f"/b[height<={h}]"                             # muxed <= cap
+        f"/b"                                          # last resort
+    )
+
+
 def build_ytdlp_argv(
     url: str,
     start: float,
@@ -37,7 +73,7 @@ def build_ytdlp_argv(
     video downloads in seconds. --force-keyframes-at-cuts is added iff precise_cuts.
     """
     argv = [
-        "-f", cfg.download_format,
+        "-f", ranged_format_selector(cfg),
         "--download-sections", f"*{_fmt_time(start)}-{_fmt_time(end)}",
     ]
     if cfg.precise_cuts:
@@ -55,6 +91,27 @@ def build_ytdlp_argv(
         url,
     ]
     return argv
+
+
+def build_ytdlp_full_argv(url: str, out_template: str, cfg: Config) -> list[str]:
+    """Argv for a NATIVE full-format download (no --download-sections).
+
+    The native downloader does not stall on fragmented DASH, so this reliably gets
+    full-res video when the ranged HLS attempt fails. The caller slices locally.
+    """
+    return [
+        "-f", full_format_selector(cfg),
+        "--merge-output-format", "mp4",
+        "--no-playlist",
+        "--newline",
+        "--progress-template", PROGRESS_TMPL,
+        "--retries", str(cfg.download_retries),
+        "--fragment-retries", "10",
+        "--concurrent-fragments", str(cfg.concurrent_fragments),
+        "--socket-timeout", str(cfg.socket_timeout_sec),
+        "-o", out_template,
+        url,
+    ]
 
 
 def build_metadata_argv(url: str) -> list[str]:
@@ -89,3 +146,8 @@ def default_out_template(work_dir: str, video_id: str, start: float, end: float)
     """Deterministic output template for a ranged segment file."""
     fname = f"{video_id}__{_fmt_time(start)}-{_fmt_time(end)}.%(ext)s"
     return os.path.join(work_dir, fname)
+
+
+def source_out_template(work_dir: str, video_id: str) -> str:
+    """Output template for a whole-video native download (shared per videoId)."""
+    return os.path.join(work_dir, f"{video_id}__source.%(ext)s")
