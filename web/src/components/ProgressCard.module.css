@@ -1,0 +1,135 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.errored {
+  border-color: var(--err);
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pct {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stepper {
+  display: flex;
+  gap: var(--sp-2);
+}
+.step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  position: relative;
+}
+.step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  z-index: 0;
+}
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  border: 2px solid var(--border-strong);
+  z-index: 1;
+  transition: 0.2s;
+}
+.stepLabel {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.step[data-state='complete'] .dot {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.step[data-state='complete']:not(:last-child)::after {
+  background: var(--ok);
+}
+.step[data-state='complete'] .stepLabel {
+  color: var(--muted);
+}
+.step[data-state='active'] .dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.step[data-state='active'] .stepLabel {
+  color: var(--accent);
+  font-weight: 600;
+}
+.step[data-state='error'] .dot {
+  background: var(--err);
+  border-color: var(--err);
+}
+
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+}
+
+.bar {
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  transition: width 0.3s;
+}
+
+.msg {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.err {
+  font-size: 13px;
+  color: var(--err);
+}
+
+.actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.preview {
+  display: flex;
+  justify-content: center;
+}
+.preview video {
+  aspect-ratio: 9 / 16;
+  max-height: 70vh;
+  border-radius: var(--r-2);
+  background: #000;
+}

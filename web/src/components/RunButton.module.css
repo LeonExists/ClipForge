@@ -1,0 +1,5 @@
+.run {
+  width: 100%;
+  padding: var(--sp-3);
+  font-size: 15px;
+}
